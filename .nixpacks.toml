@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["portaudio", "alsa-lib", "alsa-plugins", "libasound2", "libasound2-dev"]
+nixPkgs = ["portaudio", "alsa-lib", "alsa-plugins", "libasound2", "libasound2-dev", "libportaudio2", "portaudio-dev"]
