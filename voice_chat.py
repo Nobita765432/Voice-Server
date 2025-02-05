@@ -1,18 +1,19 @@
 import socket
 import threading
-import pyaudio
+import sounddevice as sd
+import numpy as np
 import time
 
 # ==== CONFIGURATION ====
-PORT = 5000  # Port to use for connections
+PORT = 5000  # Port for connections
 BUFFER_SIZE = 1024  # Audio buffer size
-FORMAT = pyaudio.paInt16  # Audio format
+SAMPLE_RATE = 44100  # Audio sample rate
 CHANNELS = 1  # Mono audio
-RATE = 44100  # Sample rate
 USERNAME = input("Enter your username: ")  # Ask for username
 
-# Check if we are the first to run (i.e., act as the server)
+# ==== SERVER DISCOVERY ====
 def find_server():
+    """Check if a server IP exists in a local file"""
     global SERVER_IP
     try:
         with open("server_ip.txt", "r") as file:
@@ -28,7 +29,7 @@ if SERVER_IP is None:
     SERVER_IP = socket.gethostbyname(socket.gethostname())
     with open("server_ip.txt", "w") as file:
         file.write(SERVER_IP)
-    print("Running as SERVER")
+    print(f"Running as SERVER on {SERVER_IP}")
 else:
     print(f"Connecting to SERVER at {SERVER_IP}")
 
@@ -40,6 +41,7 @@ server.listen(5)
 clients = []
 
 def handle_client(conn, addr):
+    """Handle individual client connections"""
     username = conn.recv(1024).decode()
     print(f"{username} joined the call!")
 
@@ -50,6 +52,7 @@ def handle_client(conn, addr):
             data = conn.recv(BUFFER_SIZE)
             if not data:
                 break
+            # Send received data to all clients except sender
             for client, _ in clients:
                 if client != conn:
                     client.sendall(data)
@@ -73,27 +76,27 @@ client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((SERVER_IP, PORT))
 client.send(USERNAME.encode())
 
-# Audio input/output
-audio = pyaudio.PyAudio()
-stream_input = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=BUFFER_SIZE)
-stream_output = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=BUFFER_SIZE)
+# ==== AUDIO STREAMING ====
+def send_audio(indata, frames, time, status):
+    """Send audio data to the server"""
+    if status:
+        print(status)
+    client.sendall(indata.tobytes())
 
-# Send audio
-def send_audio():
-    while True:
-        data = stream_input.read(BUFFER_SIZE)
-        client.sendall(data)
-
-# Receive audio
 def receive_audio():
+    """Receive and play audio from the server"""
     while True:
         data = client.recv(BUFFER_SIZE)
         if not data:
             break
-        stream_output.write(data)
+        audio_data = np.frombuffer(data, dtype=np.int16)
+        sd.play(audio_data, SAMPLE_RATE)
 
-# Start sending and receiving audio
-threading.Thread(target=send_audio, daemon=True).start()
+# Start audio input stream
+input_stream = sd.InputStream(callback=send_audio, channels=CHANNELS, samplerate=SAMPLE_RATE)
+input_stream.start()
+
+# Start receiving audio
 threading.Thread(target=receive_audio, daemon=True).start()
 
 # Keep running
