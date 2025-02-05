@@ -3,13 +3,14 @@ import threading
 import sounddevice as sd
 import numpy as np
 import time
+import os  # Import os to get PC username
 
 # ==== CONFIGURATION ====
 PORT = 5000  # Port for connections
 BUFFER_SIZE = 1024  # Audio buffer size
 SAMPLE_RATE = 44100  # Audio sample rate
 CHANNELS = 1  # Mono audio
-USERNAME = input("Enter your username: ")  # Ask for username
+USERNAME = os.getenv('USERNAME') or os.getenv('USER') or "UnknownUser"  # PC Username
 
 # ==== SERVER DISCOVERY ====
 def find_server():
